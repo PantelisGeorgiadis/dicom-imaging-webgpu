@@ -1,0 +1,169 @@
+import dicomParser from 'dicom-parser';
+
+import { Pipeline } from './Pipeline';
+import { calculateMinMaxPixelValues, getNumberValues, toTypedPixelData } from './utils';
+
+/**
+ * Gets the pixel data from a dataset.
+ */
+function getPixelData(dataset: dicomParser.DataSet, frameIndex: number = 0): Uint8Array {
+  const pixelDataElement = dataset.elements['x7fe00010'] || dataset.elements['x7fe00008'];
+  if (!pixelDataElement) {
+    throw new Error('Pixel data element was not found');
+  }
+
+  if (pixelDataElement.encapsulatedPixelData) {
+    throw new Error('Encapsulated pixel data is not supported');
+  }
+
+  return getUncompressedImageFrame(dataset, frameIndex);
+}
+
+/**
+ * Gets the uncompressed pixel data from a dataset.
+ */
+function getUncompressedImageFrame(dataset: dicomParser.DataSet, frameIndex: number): Uint8Array {
+  const pixelDataElement = dataset.elements['x7fe00010'] || dataset.elements['x7fe00008'];
+  const bitsAllocated = dataset.uint16('x00280100');
+  const rows = dataset.uint16('x00280010');
+  const columns = dataset.uint16('x00280011');
+  const samplesPerPixel = dataset.uint16('x00280002');
+
+  if (!pixelDataElement) {
+    throw new Error('Pixel data element is missing');
+  }
+  if (!bitsAllocated || !rows || !columns || !samplesPerPixel) {
+    throw new Error(
+      `Missing required attributes [allocated: ${bitsAllocated}, rows: ${rows}, columns: ${columns}, samples: ${samplesPerPixel}]`
+    );
+  }
+
+  const pixelDataOffset = pixelDataElement.dataOffset;
+  const pixelsPerFrame = rows * columns * samplesPerPixel;
+  if (bitsAllocated === 8) {
+    const frameOffset = pixelDataOffset + frameIndex * pixelsPerFrame;
+    if (frameOffset >= dataset.byteArray.length) {
+      throw new Error('Frame exceeds size of pixel data');
+    }
+    return new Uint8Array(
+      dataset.byteArray.buffer.slice(frameOffset, frameOffset + pixelsPerFrame)
+    );
+  } else if (bitsAllocated === 16) {
+    const frameOffset = pixelDataOffset + frameIndex * pixelsPerFrame * 2;
+    if (frameOffset >= dataset.byteArray.length) {
+      throw new Error('Frame exceeds size of pixel data');
+    }
+    return new Uint8Array(
+      dataset.byteArray.buffer.slice(frameOffset, frameOffset + pixelsPerFrame * 2)
+    );
+  }
+
+  throw new Error(`Unsupported pixel format [Bits allocated: ${bitsAllocated}]`);
+}
+
+/**
+ * Renders a dataset.
+ */
+export async function render(
+  gpuDevice: GPUDevice,
+  dicomDataBuffer: Uint8Array,
+  options?: {
+    frameIndex?: number;
+  }
+): Promise<{
+  pixelData: Uint8Array | undefined;
+  width: number | undefined;
+  height: number | undefined;
+}> {
+  if (!gpuDevice) {
+    throw new Error('GPU device is required');
+  }
+  if (!dicomDataBuffer) {
+    throw new Error('DICOM data buffer is required');
+  }
+  options = options || {};
+
+  // Parse DICOM dataset
+  const dataset = dicomParser.parseDicom(dicomDataBuffer);
+  if (!dataset) {
+    throw new Error('Failed to parse DICOM data');
+  }
+
+  // Extract transfer syntax UID
+  const transferSyntaxUid = dataset.string('x00020010');
+  if (!transferSyntaxUid) {
+    throw new Error('Transfer syntax UID is missing');
+  }
+
+  // Extract pixel data
+  const pixelData = getPixelData(dataset, options.frameIndex || 0);
+  if (!pixelData) {
+    throw new Error('Pixel data is missing');
+  }
+
+  // Extract dimensions
+  const rows = dataset.uint16('x00280010');
+  const columns = dataset.uint16('x00280011');
+  if (!rows || !columns) {
+    throw new Error('Rows and columns are required');
+  }
+
+  // Make a typed array from pixel data
+  const pixelRepresentation = dataset.uint16('x00280103') || 0;
+  const bitsAllocated = dataset.uint16('x00280100') || 0;
+  const bitsStored = dataset.uint16('x00280101') || bitsAllocated;
+  const highBit = dataset.uint16('x00280102') || bitsStored - 1;
+  if (bitsAllocated !== 8 && bitsAllocated !== 16) {
+    throw new Error(`Invalid bits allocated value [bits: ${bitsAllocated}]`);
+  }
+
+  const typedPixelData = toTypedPixelData(
+    pixelData,
+    pixelRepresentation,
+    bitsAllocated,
+    bitsStored,
+    highBit
+  );
+
+  // Calculate min and max pixel values
+  const { minPixelValue, maxPixelValue } = calculateMinMaxPixelValues(typedPixelData);
+
+  // Determine window center and width
+  const rescaleIntercept = dataset.floatString('x00281052') || 0.0;
+  const rescaleSlope = dataset.floatString('x00281053') || 1.0;
+
+  const wc = getNumberValues(dataset, 'x00281050', 1);
+  let windowCenter = Array.isArray(wc) ? wc[0] : wc;
+  const ww = getNumberValues(dataset, 'x00281051', 1);
+  let windowWidth = Array.isArray(ww) ? ww[0] : ww;
+  if (windowCenter === undefined || windowWidth === undefined) {
+    const maxVoi = maxPixelValue * rescaleSlope + rescaleIntercept;
+    const minVoi = minPixelValue * rescaleSlope + rescaleIntercept;
+    windowWidth = maxVoi - minVoi;
+    windowCenter = (maxVoi + minVoi) / 2;
+  }
+
+  const imageFrame = {
+    samplesPerPixel: dataset.uint16('x00280002') || 1,
+    photometricInterpretation: dataset.string('x00280004') || '',
+    planarConfiguration: dataset.uint16('x00280006') || 0,
+    rows,
+    columns,
+    bitsAllocated,
+    bitsStored,
+    highBit,
+    rescaleIntercept,
+    rescaleSlope,
+    pixelRepresentation,
+    minPixelValue,
+    maxPixelValue,
+    windowCenter,
+    windowWidth,
+    pixelData: typedPixelData,
+  };
+
+  const pipeline = Pipeline.create(gpuDevice, imageFrame);
+  const renderingResult = await pipeline.render(imageFrame, options);
+
+  return renderingResult;
+}

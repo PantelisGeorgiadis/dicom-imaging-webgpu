@@ -1,0 +1,55 @@
+{
+  "name": "dicom-imaging-webgpu",
+  "version": "0.0.1",
+  "description": "DICOM image rendering pipeline that leverages WebGPU for hardware-accelerated visualization",
+  "type": "module",
+  "main": "build/dicom-imaging-webgpu.js",
+  "types": "build/dicom-imaging-webgpu.d.js",
+  "scripts": {
+    "build": "shx rm -rf dist && shx rm -rf build && tsc && rollup --config rollup.config.ts --configPlugin rollup-plugin-typescript2",
+    "dev": "shx rm -rf dist && shx rm -rf build && tsc && rollup --watch --config rollup.config.dev.ts --configPlugin rollup-plugin-typescript2",
+    "format": "prettier --config .prettierrc.json --write src/**/*.ts static/**/*.html",
+    "lint": "eslint -c .eslintrc.json ."
+  },
+  "author": "Pantelis Georgiadis",
+  "license": "MIT",
+  "dependencies": {
+    "dicom-parser": "^1.8.21"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.26.9",
+    "@rollup/plugin-babel": "^6.0.4",
+    "@rollup/plugin-commonjs": "^28.0.3",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@trivago/prettier-plugin-sort-imports": "^5.2.2",
+    "@types/node": "^24.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.29.1",
+    "@typescript-eslint/parser": "^8.29.1",
+    "@webgpu/types": "^0.1.64",
+    "eslint": "^9.24.0",
+    "eslint-config-prettier": "^10.1.2",
+    "eslint-plugin-prettier": "^5.2.6",
+    "extensionless": "^1.9.9",
+    "fast-glob": "^3.3.3",
+    "prettier": "^3.5.3",
+    "rollup": "^4.40.0",
+    "rollup-plugin-dts": "^6.2.1",
+    "rollup-plugin-serve": "^3.0.0",
+    "rollup-plugin-typescript2": "^0.36.0",
+    "shx": "^0.4.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
+  },
+  "extensionless": {
+    "lookFor": [
+      "js"
+    ]
+  },
+  "files": [
+    "build/dicom-imaging-webgpu.d.ts",
+    "build/dicom-imaging-webgpu.js",
+    "build/dicom-imaging-webgpu.js.map",
+    "static/index.html"
+  ]
+}
