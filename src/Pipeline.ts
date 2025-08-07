@@ -224,6 +224,7 @@ class GrayscalePipeline extends Pipeline {
     computePass.dispatchWorkgroups(Math.ceil(columns / 8), Math.ceil(rows / 8));
     computePass.end();
 
+    // Copy the results to the staging buffer
     encoder.copyBufferToBuffer(renderedPixelDataBuffer, 0, stagingBuffer, 0, dataSize);
 
     // Finish encoding and submit the commands
@@ -236,6 +237,7 @@ class GrayscalePipeline extends Pipeline {
     stagingBuffer.unmap();
 
     // Destroy buffers
+    stagingBuffer.destroy();
     imageFrameBuffer.destroy();
     renderedPixelDataBuffer.destroy();
 
