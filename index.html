@@ -41,38 +41,47 @@
   <script type="text/javascript" src="https://unpkg.com/dicom-parser"></script>
   <script type="text/javascript" src="dicom-imaging-webgpu.js"></script>
   <script>
+    const { initialize, render, version } = window.dicomImagingWebGpu;
+
     let webGpuAdapter;
     let webGpuDevice;
+    let canvasElement;
+    let infoTextElement;
 
     window.onload = async (event) => {
       if (navigator.gpu) {
         webGpuAdapter = await navigator.gpu.requestAdapter();
         webGpuDevice = await webGpuAdapter.requestDevice();
       }
-    };
 
-    const { render } = window.dicomImagingWebGpu;
+      await initialize();
+
+      canvasElement = document.getElementById('renderingCanvas');
+      infoTextElement = document.getElementById('infoText');
+      infoTextElement.innerHTML += `<br />[version: ${version}]`;
+    };
 
     function renderFile(file) {
       const reader = new FileReader();
       reader.onload = async (file) => {
         const arrayBuffer = reader.result;
-        const canvasElement = document.getElementById('renderingCanvas');
         canvasElement.width = 0;
         canvasElement.height = 0;
-
-        const infoTextElement = document.getElementById('infoText');
         infoTextElement.innerText = '';
 
         try {
+          if (!webGpuDevice) {
+            throw new Error('WebGPU device is not available');
+          }
+
           const t0 = performance.now();
           const renderingResult = await render(webGpuDevice, new Uint8Array(arrayBuffer));
           const t1 = performance.now();
-          console.log(`Parsing and rendering time: ${t1 - t0} ms`);
+          console.log(`Parsing, decoding and rendering time: ${t1 - t0} ms`);
 
           renderFrameCanvas(renderingResult, canvasElement);
         } catch (err) {
-          infoTextElement.innerText = 'Error: ' + err.message;
+          infoTextElement.innerText = `Error: ${err.message}`;
           throw err;
         }
       };

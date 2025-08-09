@@ -1,3 +1,9 @@
+declare const version = "0.0.2";
+
+/**
+ * Initializes the frame decoder.
+ */
+declare function initialize(options?: Record<string, unknown>): Promise<void>;
 /**
  * Renders a dataset.
  */
@@ -9,4 +15,4 @@ declare function render(gpuDevice: GPUDevice, dicomDataBuffer: Uint8Array, optio
     height: number | undefined;
 }>;
 
-export { render };
+export { initialize, render, version };
