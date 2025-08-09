@@ -10,7 +10,7 @@
     "sourceMap": true,
     "strict": true,
     "target": "es2022",
-    "types": ["@webgpu/types"]
+    "types": ["@webgpu/types", "@types/web"]
   },
   "exclude": ["node_modules"],
   "include": ["src/**/*"]

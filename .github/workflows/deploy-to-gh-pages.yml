@@ -38,7 +38,7 @@ jobs:
       - name: Create public folder
         run: |
           mkdir ./public
-          cp -r ./build/dicom-imaging-webgpu.d.ts ./build/dicom-imaging-webgpu.js ./build/dicom-imaging-webgpu.js.map ./static/index.html ./public
+          cp -r ./build/dicom-imaging-webgpu.d.ts ./build/dicom-imaging-webgpu.js ./build/dicom-imaging-webgpu.js.map ./static/index.html ./wasm/dcmjs-native-codecs.wasm ./public
       
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3

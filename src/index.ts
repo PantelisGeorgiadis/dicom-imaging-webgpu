@@ -1,7 +1,10 @@
 import dicomParser from 'dicom-parser';
+import pako from 'pako';
 
+import { FrameDecoder } from './FrameDecoder';
 import { Pipeline } from './Pipeline';
 import { calculateMinMaxPixelValues, getNumberValues, toTypedPixelData } from './utils';
+import { version } from './version';
 
 /**
  * Gets the pixel data from a dataset.
@@ -12,11 +15,41 @@ function getPixelData(dataset: dicomParser.DataSet, frameIndex: number = 0): Uin
     throw new Error('Pixel data element was not found');
   }
 
-  if (pixelDataElement.encapsulatedPixelData) {
-    throw new Error('Encapsulated pixel data is not supported');
+  return pixelDataElement.encapsulatedPixelData
+    ? getEncapsulatedImageFrame(dataset, frameIndex)
+    : getUncompressedImageFrame(dataset, frameIndex);
+}
+
+function getEncapsulatedImageFrame(
+  dataset: dicomParser.DataSet,
+  frameIndex: number = 0
+): Uint8Array {
+  if (dataset.elements['x7fe00010']?.basicOffsetTable?.length) {
+    // Basic Offset Table is not empty
+    return dicomParser.readEncapsulatedImageFrame(
+      dataset,
+      dataset.elements['x7fe00010'],
+      frameIndex
+    );
   }
 
-  return getUncompressedImageFrame(dataset, frameIndex);
+  // Empty basic offset table
+  const numberOfFrames = dataset.intString('x00280008');
+  const pixelDataElement = dataset.elements['x7fe00010'];
+  const framesAreFragmented =
+    pixelDataElement && numberOfFrames !== pixelDataElement.fragments?.length;
+  if (framesAreFragmented) {
+    const basicOffsetTable = dicomParser.createJPEGBasicOffsetTable(dataset, pixelDataElement);
+
+    return dicomParser.readEncapsulatedImageFrame(
+      dataset,
+      pixelDataElement,
+      frameIndex,
+      basicOffsetTable
+    );
+  }
+
+  return dicomParser.readEncapsulatedPixelDataFromFragments(dataset, pixelDataElement!, frameIndex);
 }
 
 /**
@@ -62,6 +95,13 @@ function getUncompressedImageFrame(dataset: dicomParser.DataSet, frameIndex: num
 }
 
 /**
+ * Initializes the frame decoder.
+ */
+export async function initialize(options?: Record<string, unknown>): Promise<void> {
+  await FrameDecoder.initialize(options);
+}
+
+/**
  * Renders a dataset.
  */
 export async function render(
@@ -84,7 +124,19 @@ export async function render(
   options = options || {};
 
   // Parse DICOM dataset
-  const dataset = dicomParser.parseDicom(dicomDataBuffer);
+  const dataset = dicomParser.parseDicom(dicomDataBuffer, {
+    inflater: (byteArray: Uint8Array, position: number) => {
+      const deflated = byteArray.slice(position);
+      const inflated = pako.inflateRaw(deflated);
+
+      const fullByteArray = new Uint8Array(inflated.length + position);
+      fullByteArray.set(dicomDataBuffer.slice(0, position), 0);
+      fullByteArray.set(inflated, position);
+
+      return fullByteArray;
+    },
+  });
+
   if (!dataset) {
     throw new Error('Failed to parse DICOM data');
   }
@@ -108,17 +160,48 @@ export async function render(
     throw new Error('Rows and columns are required');
   }
 
-  // Make a typed array from pixel data
-  const pixelRepresentation = dataset.uint16('x00280103') || 0;
+  // Extract pixel parameters
   const bitsAllocated = dataset.uint16('x00280100') || 0;
   const bitsStored = dataset.uint16('x00280101') || bitsAllocated;
-  const highBit = dataset.uint16('x00280102') || bitsStored - 1;
   if (bitsAllocated !== 8 && bitsAllocated !== 16) {
     throw new Error(`Invalid bits allocated value [bits: ${bitsAllocated}]`);
   }
 
+  const pixelRepresentation = dataset.uint16('x00280103') || 0;
+  const highBit = dataset.uint16('x00280102') || bitsStored - 1;
+  const samplesPerPixel = dataset.uint16('x00280002') || 1;
+  let photometricInterpretation = dataset.string('x00280004') || '';
+  const planarConfiguration = dataset.uint16('x00280006') || 0;
+
+  // Decode pixel data
+  if (!FrameDecoder.isInitialized()) {
+    throw new Error('Frame decoder is not initialized');
+  }
+
+  const decodedPixelData = FrameDecoder.decodePixelData(transferSyntaxUid, {
+    width: columns,
+    height: rows,
+    bitsAllocated,
+    bitsStored,
+    samplesPerPixel,
+    pixelRepresentation,
+    planarConfiguration,
+    photometricInterpretation,
+    encodedBuffer: pixelData,
+  });
+
+  if (!decodedPixelData || !decodedPixelData.decodedBuffer) {
+    throw new Error('Failed to decode pixel data');
+  }
+
+  // Photometric interpretation might change
+  if (decodedPixelData.photometricInterpretation) {
+    photometricInterpretation = decodedPixelData.photometricInterpretation;
+  }
+
+  // Make a typed array from pixel data
   const typedPixelData = toTypedPixelData(
-    pixelData,
+    decodedPixelData.decodedBuffer,
     pixelRepresentation,
     bitsAllocated,
     bitsStored,
@@ -144,9 +227,9 @@ export async function render(
   }
 
   const imageFrame = {
-    samplesPerPixel: dataset.uint16('x00280002') || 1,
-    photometricInterpretation: dataset.string('x00280004') || '',
-    planarConfiguration: dataset.uint16('x00280006') || 0,
+    samplesPerPixel,
+    photometricInterpretation,
+    planarConfiguration,
     rows,
     columns,
     bitsAllocated,
@@ -167,3 +250,8 @@ export async function render(
 
   return renderingResult;
 }
+
+/**
+ * Export version.
+ */
+export { version };

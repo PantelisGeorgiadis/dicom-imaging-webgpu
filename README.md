@@ -1,7 +1,7 @@
 # dicom-imaging-webgpu
 
 ## Summary
-This project is a DICOM (Digital Imaging and Communications in Medicine) image rendering pipeline that leverages WebGPU for hardware-accelerated visualization.
+This project is a DICOM image rendering pipeline that leverages WebGPU for hardware-accelerated visualization.
 
 Please check a live example [here][dicom-imaging-webgpu-live-example-url].
 
@@ -13,6 +13,7 @@ Please check a live example [here][dicom-imaging-webgpu-live-example-url].
 - TypeScript for type-safe development.
 - WebGPU for GPU-accelerated computing.
 - DICOM image format support using the [dicom-parser][dicom-parser-url] library.
+- WebAssembly module to decode encapsulated transfer syntaxes (re-used from the [dcmjs-codecs][dcmjs-codecs-url] library).
 
 ## Current Status
 ⚠️ Work in Progress: This project is currently under active development and is not ready for production use. It should not be used for clinical or diagnostic purposes.
@@ -21,4 +22,5 @@ Please check a live example [here][dicom-imaging-webgpu-live-example-url].
 dicom-imaging-webgpu is released under the MIT License.
 
 [dicom-parser-url]: https://github.com/cornerstonejs/dicomParser
+[dcmjs-codecs-url]: https://github.com/PantelisGeorgiadis/dcmjs-codecs
 [dicom-imaging-webgpu-live-example-url]: https://pantelisgeorgiadis.github.io/dicom-imaging-webgpu/

@@ -37,7 +37,7 @@ const config: RollupOptions = {
       },
     },
     serve({
-      contentBase: ['build', 'static'],
+      contentBase: ['build', 'static', 'wasm'],
       host: 'localhost',
       onListening: function (server: Server) {
         const address = server.address() as AddressInfo;

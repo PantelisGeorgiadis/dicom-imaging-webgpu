@@ -51,6 +51,12 @@ export class Pipeline {
       this.pipelineCache.set(imageFrame.photometricInterpretation, grayscalePipeline);
 
       return grayscalePipeline;
+    } else if (imageFrame.photometricInterpretation === 'RGB') {
+      const colorPipeline = new ColorRgbPipeline();
+      colorPipeline.initialize(gpuDevice);
+      this.pipelineCache.set(imageFrame.photometricInterpretation, colorPipeline);
+
+      return colorPipeline;
     } else {
       throw new Error(
         `Unsupported photometric interpretation: ${imageFrame.photometricInterpretation}`
@@ -145,15 +151,14 @@ class GrayscalePipeline extends Pipeline {
       windowCenter,
       windowWidth,
       pixelData,
-      minPixelValue,
-      maxPixelValue,
       photometricInterpretation,
     } = imageFrame;
-    const shouldInvert = photometricInterpretation === 'MONOCHROME1';
+    const shouldInvert = photometricInterpretation === 'MONOCHROME1' ? 1 : 0;
 
     // Calculate the size of the pixel data as f32
     // Add extra image frame parameters to front and meet 16-byte alignment
     const dataSize = rows * columns * 4;
+    const rgbaDataSize = 4 * dataSize;
     const bufferSize = dataSize + 32;
     const alignedBufferSize = Math.ceil(bufferSize / 16) * 16;
 
@@ -167,14 +172,14 @@ class GrayscalePipeline extends Pipeline {
     // Create a buffer on the GPU to hold pixel computation output
     const renderedPixelDataBuffer = this.device.createBuffer({
       label: 'Pixel data buffer output',
-      size: bufferSize,
+      size: 4 * bufferSize, // RGBA format
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     });
 
     // Create a staging buffer
     const stagingBuffer = this.device.createBuffer({
       label: 'Pixel data staging buffer',
-      size: dataSize,
+      size: rgbaDataSize,
       usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
     });
 
@@ -200,11 +205,7 @@ class GrayscalePipeline extends Pipeline {
       16,
       new Float32Array([windowCenter, windowWidth])
     );
-    this.device.queue.writeBuffer(
-      imageFrameBuffer,
-      24,
-      new Float32Array([minPixelValue, maxPixelValue])
-    );
+    this.device.queue.writeBuffer(imageFrameBuffer, 24, new Float32Array([0, shouldInvert]));
 
     // Set pixel data
     const typedPixelData = pixelData;
@@ -225,15 +226,15 @@ class GrayscalePipeline extends Pipeline {
     computePass.end();
 
     // Copy the results to the staging buffer
-    encoder.copyBufferToBuffer(renderedPixelDataBuffer, 0, stagingBuffer, 0, dataSize);
+    encoder.copyBufferToBuffer(renderedPixelDataBuffer, 0, stagingBuffer, 0, rgbaDataSize);
 
     // Finish encoding and submit the commands
     const commandBuffer = encoder.finish();
     this.device.queue.submit([commandBuffer]);
 
     // Read the results
-    await stagingBuffer.mapAsync(GPUMapMode.READ, 0, dataSize);
-    const result = new Float32Array(stagingBuffer.getMappedRange(0, dataSize).slice());
+    await stagingBuffer.mapAsync(GPUMapMode.READ, 0, rgbaDataSize);
+    const result = new Float32Array(stagingBuffer.getMappedRange(0, rgbaDataSize).slice());
     stagingBuffer.unmap();
 
     // Destroy buffers
@@ -241,13 +242,49 @@ class GrayscalePipeline extends Pipeline {
     imageFrameBuffer.destroy();
     renderedPixelDataBuffer.destroy();
 
+    // Convert the result to RGBA bytes (it is already clamped in the shader)
     const rgbaPixels = new Uint8Array(4 * rows * columns);
-    for (let i = 0, p = 0; i < rows * columns; i++) {
-      const pixel = shouldInvert ? 0xff - Math.trunc(result[i]) : Math.trunc(result[i]);
-      rgbaPixels[p++] = pixel;
-      rgbaPixels[p++] = pixel;
-      rgbaPixels[p++] = pixel;
-      rgbaPixels[p++] = 0xff;
+    rgbaPixels.set(result);
+
+    return {
+      pixelData: rgbaPixels,
+      width: columns,
+      height: rows,
+    };
+  }
+}
+//#endregion
+
+//#region ColorRgbPipeline
+class ColorRgbPipeline extends Pipeline {
+  /**
+   * Initializes the color pipeline.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  initialize(gpuDevice: GPUDevice): void {}
+
+  /**
+   * Renders a color image frame on GPU.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async render(
+    imageFrame: ImageFrameType,
+    options?: Record<string, unknown>
+  ): Promise<{
+    pixelData: Uint8Array | undefined;
+    width: number | undefined;
+    height: number | undefined;
+  }> {
+    const { rows, columns, pixelData, planarConfiguration } = imageFrame;
+
+    const rgbaPixels = new Uint8Array(4 * rows * columns);
+    for (let i = 0, p = 0; i < rows * columns; i++, p += 4) {
+      rgbaPixels[p] = planarConfiguration === 1 ? pixelData[i] : pixelData[i * 3];
+      rgbaPixels[p + 1] =
+        planarConfiguration === 1 ? pixelData[i + rows * columns] : pixelData[i * 3 + 1];
+      rgbaPixels[p + 2] =
+        planarConfiguration === 1 ? pixelData[i + 2 * rows * columns] : pixelData[i * 3 + 2];
+      rgbaPixels[p + 3] = 0xff;
     }
 
     return {
