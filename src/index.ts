@@ -129,11 +129,11 @@ export async function render(
       const deflated = byteArray.slice(position);
       const inflated = pako.inflateRaw(deflated);
 
-      const fullByteArray = new Uint8Array(inflated.length + position);
-      fullByteArray.set(dicomDataBuffer.slice(0, position), 0);
-      fullByteArray.set(inflated, position);
+      const completeByteArray = new Uint8Array(inflated.length + position);
+      completeByteArray.set(dicomDataBuffer.slice(0, position), 0);
+      completeByteArray.set(inflated, position);
 
-      return fullByteArray;
+      return completeByteArray;
     },
   });
 
@@ -178,7 +178,7 @@ export async function render(
     throw new Error('Frame decoder is not initialized');
   }
 
-  const decodedPixelData = FrameDecoder.decodePixelData(transferSyntaxUid, {
+  const decodedPixelData = FrameDecoder.decodeFrameData(transferSyntaxUid, {
     width: columns,
     height: rows,
     bitsAllocated,

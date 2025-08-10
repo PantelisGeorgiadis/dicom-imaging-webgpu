@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages CI
+name: Build CI
 
 on:
   push:
@@ -7,12 +7,14 @@ on:
     branches: [ master ]
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: 'write'
-    
+      actions: read
+      contents: read
+      security-events: write
+
     strategy:
       matrix:
         node-version: [24.x]
@@ -24,6 +26,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+      
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
@@ -34,15 +41,6 @@ jobs:
       
       - name: Build
         run: npm run build
-
-      - name: Create public folder
-        run: |
-          mkdir ./public
-          cp -r ./build/dicom-imaging-webgpu.d.ts ./build/dicom-imaging-webgpu.js ./build/dicom-imaging-webgpu.js.map ./static/index.html ./wasm/dcmjs-native-codecs.wasm ./public
       
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        if: ${{ github.ref == 'refs/heads/master' }}
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3

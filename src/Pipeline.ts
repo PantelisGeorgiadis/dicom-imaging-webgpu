@@ -17,9 +17,10 @@ export class Pipeline {
   /**
    * Renders using the pipeline.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async render(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     imageFrame: ImageFrameType,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     options?: Record<string, unknown>
   ): Promise<{
     pixelData: Uint8Array | undefined;
@@ -126,9 +127,9 @@ class GrayscalePipeline extends Pipeline {
   /**
    * Renders a grayscale image frame on GPU.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async render(
     imageFrame: ImageFrameType,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     options?: Record<string, unknown>
   ): Promise<{
     pixelData: Uint8Array | undefined;
@@ -264,11 +265,11 @@ class ColorRgbPipeline extends Pipeline {
   initialize(gpuDevice: GPUDevice): void {}
 
   /**
-   * Renders a color image frame on GPU.
+   * Renders a color image frame.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async render(
     imageFrame: ImageFrameType,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     options?: Record<string, unknown>
   ): Promise<{
     pixelData: Uint8Array | undefined;
@@ -276,14 +277,17 @@ class ColorRgbPipeline extends Pipeline {
     height: number | undefined;
   }> {
     const { rows, columns, pixelData, planarConfiguration } = imageFrame;
+    const shouldConvertToInterleaved = planarConfiguration === 1;
 
     const rgbaPixels = new Uint8Array(4 * rows * columns);
     for (let i = 0, p = 0; i < rows * columns; i++, p += 4) {
-      rgbaPixels[p] = planarConfiguration === 1 ? pixelData[i] : pixelData[i * 3];
-      rgbaPixels[p + 1] =
-        planarConfiguration === 1 ? pixelData[i + rows * columns] : pixelData[i * 3 + 1];
-      rgbaPixels[p + 2] =
-        planarConfiguration === 1 ? pixelData[i + 2 * rows * columns] : pixelData[i * 3 + 2];
+      rgbaPixels[p] = shouldConvertToInterleaved ? pixelData[i] : pixelData[i * 3];
+      rgbaPixels[p + 1] = shouldConvertToInterleaved
+        ? pixelData[i + rows * columns]
+        : pixelData[i * 3 + 1];
+      rgbaPixels[p + 2] = shouldConvertToInterleaved
+        ? pixelData[i + 2 * rows * columns]
+        : pixelData[i * 3 + 2];
       rgbaPixels[p + 3] = 0xff;
     }
 
