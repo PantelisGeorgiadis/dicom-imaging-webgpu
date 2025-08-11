@@ -1,10 +1,10 @@
-import { PipelineCache } from './PipelineCache';
+import { Cache } from './Cache';
 import { GrayscaleShader } from './shaders';
 import { ImageFrameType } from './types';
 
 //#region Pipeline
 export class Pipeline {
-  private static readonly pipelineCache: PipelineCache = new PipelineCache(5);
+  private static readonly pipelineCache: Cache<Pipeline> = new Cache<Pipeline>(5);
 
   /**
    * Initializes the pipeline.
@@ -77,10 +77,13 @@ class GrayscalePipeline extends Pipeline {
    * Initializes the grayscale pipeline.
    */
   initialize(gpuDevice: GPUDevice): void {
-    // Shader module
+    // Shader module (minify code - remove multiple line breaks and comments)
     const shaderModule = gpuDevice.createShaderModule({
       label: 'Grayscale shader module',
-      code: GrayscaleShader,
+      code: GrayscaleShader.replace(/\n\s*\n/g, '\n').replace(
+        /\/\*[\s\S]*?\*\/|(?<=[^:])\/\/.*|^\/\/.*/g,
+        ''
+      ),
     });
 
     // Bind group layout
@@ -204,7 +207,7 @@ class GrayscalePipeline extends Pipeline {
     this.device.queue.writeBuffer(
       imageFrameBuffer,
       16,
-      new Float32Array([windowCenter, windowWidth])
+      new Float32Array([windowCenter - 0.5, windowWidth - 1.0])
     );
     this.device.queue.writeBuffer(imageFrameBuffer, 24, new Float32Array([0, shouldInvert]));
 
@@ -223,7 +226,7 @@ class GrayscalePipeline extends Pipeline {
     });
     computePass.setPipeline(this.computePipeline);
     computePass.setBindGroup(0, bindGroup);
-    computePass.dispatchWorkgroups(Math.ceil(columns / 8), Math.ceil(rows / 8));
+    computePass.dispatchWorkgroups(Math.ceil(columns / 16), Math.ceil(rows / 16));
     computePass.end();
 
     // Copy the results to the staging buffer
@@ -235,7 +238,7 @@ class GrayscalePipeline extends Pipeline {
 
     // Read the results
     await stagingBuffer.mapAsync(GPUMapMode.READ, 0, rgbaDataSize);
-    const result = new Float32Array(stagingBuffer.getMappedRange(0, rgbaDataSize).slice());
+    const result = new Uint32Array(stagingBuffer.getMappedRange(0, rgbaDataSize).slice());
     stagingBuffer.unmap();
 
     // Destroy buffers

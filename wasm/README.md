@@ -1,7 +1,7 @@
 # dcmjs-native-codecs
 
 ## Summary
-This dcmjs-native-codecs WebAssembly was taken from the [dcmjs-codecs][dcmjs-codecs-url] project. It is re-used to decode the following supported transfer syntaxes.
+The dcmjs-native-codecs WebAssembly was taken from the [dcmjs-codecs][dcmjs-codecs-url] project. It is re-used to decode the following supported transfer syntaxes.
 
 ## Supported Transfer Syntaxes
 - RLE Lossless (1.2.840.10008.1.2.5)
@@ -16,6 +16,6 @@ This dcmjs-native-codecs WebAssembly was taken from the [dcmjs-codecs][dcmjs-cod
 - High Throughput JPEG 2000 Image Compression (1.2.840.10008.1.2.4.203)
 
 ### License
-dicom-imaging-webgpu is released under the MIT License.
+dcmjs-native-codecs is released under the MIT License.
 
 [dcmjs-codecs-url]: https://github.com/PantelisGeorgiadis/dcmjs-codecs

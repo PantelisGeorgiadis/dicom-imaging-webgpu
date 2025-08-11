@@ -1,12 +1,10 @@
-import { Pipeline } from './Pipeline';
-
-//#region PipelineCache
-export class PipelineCache {
-  private readonly cache: Map<string, Pipeline>;
+//#region Cache
+export class Cache<T> {
+  private readonly cache: Map<string, T>;
   private readonly max: number;
 
   /**
-   * Creates an instance of PipelineCache.
+   * Creates an instance of Cache.
    */
   constructor(max: number) {
     this.max = max;
@@ -14,9 +12,9 @@ export class PipelineCache {
   }
 
   /**
-   * Gets a pipeline from the cache.
+   * Gets an object from the cache.
    */
-  get(key: string): Pipeline | undefined {
+  get(key: string): T | undefined {
     const item = this.cache.get(key);
     if (item) {
       this.cache.delete(key);
@@ -27,9 +25,9 @@ export class PipelineCache {
   }
 
   /**
-   * Sets a pipeline to the cache.
+   * Sets an object to the cache.
    */
-  set(key: string, value: Pipeline): void {
+  set(key: string, value: T): void {
     if (this.cache.has(key)) {
       this.cache.delete(key);
     } else if (this.cache.size === this.max) {

@@ -10,8 +10,8 @@ struct Scale {
 }
 
 struct Window {
-    center: f32,
-    width: f32
+    centerMin05: f32,
+    widthMin1: f32
 }
 
 struct Lut {
@@ -28,9 +28,9 @@ struct ImageFrame {
 }
 
 @group(0) @binding(0) var <storage, read> imageFrame: ImageFrame;
-@group(0) @binding(1) var <storage, read_write> renderedPixelData: array<vec4<f32>>;
+@group(0) @binding(1) var <storage, read_write> renderedPixelData: array<vec4<u32>>;
 
-@compute @workgroup_size(8, 8)
+@compute @workgroup_size(16, 16)
 fn main(
     @builtin(global_invocation_id) global_id: vec3<u32>
 ) {
@@ -38,29 +38,22 @@ fn main(
         return;
     }
 
-    // Get pixel
-    let idx = (imageFrame.dimensions.columns * global_id.y) + global_id.x;
-    let p = imageFrame.pixelData[idx];
+    // Current index
+    let idx: u32 = imageFrame.dimensions.columns * global_id.y + global_id.x;
 
     // Apply rescale LUT
-    let s = p * imageFrame.scaling.slope + imageFrame.scaling.intercept;
+    let s: f32 = imageFrame.pixelData[idx] * imageFrame.scaling.slope + imageFrame.scaling.intercept;
 
     // Apply VOI LUT
-    let centerMin05 = imageFrame.window.center - 0.5;
-    let widthMin1 = imageFrame.window.width - 1.0;
-    let widthDiv2 = widthMin1 / 2.0;
-    let v = (((s - centerMin05) / widthMin1 + 0.5) * 255.0);
+    let v: f32 = (((s - imageFrame.window.centerMin05) / imageFrame.window.widthMin1 + 0.5) * 255.0);
 
     // Clamp to [0, 255]
-    let c = clamp(v, 0.0, 255.0);
+    let c: u32 = u32(clamp(v, 0.0, 255.0));
 
     // Invert if needed
-    var r: f32 = c;
-    if imageFrame.lut.invert > 0u {
-        r = 255.0 - c;
-    }
+    let r: u32 = select(c, 255u - c, imageFrame.lut.invert > 0u);
 
     // Write the result
-    renderedPixelData[idx] = vec4<f32> (r, r, r, 255.0);
+    renderedPixelData[idx] = vec4<u32>(r, r, r, 255u);
 }
 `;

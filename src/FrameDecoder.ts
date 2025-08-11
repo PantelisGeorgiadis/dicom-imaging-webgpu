@@ -137,6 +137,13 @@ export class FrameDecoder {
       case TransferSyntax.HtJpeg2000LosslessRpcl:
       case TransferSyntax.HtJpeg2000Lossy:
         decodedContext = this._decodeJpeg2000(frameParameters);
+        if (
+          frameParameters.photometricInterpretation === PhotometricInterpretation.YbrRct ||
+          frameParameters.photometricInterpretation === PhotometricInterpretation.YbrIct
+        ) {
+          // OpenJPEG always outputs RGB
+          decodedContext.photometricInterpretation = PhotometricInterpretation.Rgb;
+        }
         break;
       default:
         throw new Error(`Unsupported transfer syntax UID: ${transferSyntaxUid}`);

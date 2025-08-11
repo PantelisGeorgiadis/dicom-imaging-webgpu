@@ -1,10 +1,14 @@
 import dicomParser from 'dicom-parser';
 import pako from 'pako';
 
+import { Cache } from './Cache';
 import { FrameDecoder } from './FrameDecoder';
 import { Pipeline } from './Pipeline';
+import { ImageFrameType } from './types';
 import { calculateMinMaxPixelValues, getNumberValues, toTypedPixelData } from './utils';
 import { version } from './version';
+
+const imageFrameCache: Cache<ImageFrameType> = new Cache<ImageFrameType>(3);
 
 /**
  * Gets the pixel data from a dataset.
@@ -108,6 +112,7 @@ export async function render(
   gpuDevice: GPUDevice,
   dicomDataBuffer: Uint8Array,
   options?: {
+    cacheKey?: string;
     frameIndex?: number;
   }
 ): Promise<{
@@ -121,6 +126,35 @@ export async function render(
   if (!dicomDataBuffer) {
     throw new Error('DICOM data buffer is required');
   }
+
+  let imageFrame: ImageFrameType | undefined = undefined;
+  let imageFrameCreated = false;
+  if (options && options.cacheKey) {
+    imageFrame = imageFrameCache.get(options.cacheKey);
+  }
+  if (!imageFrame) {
+    imageFrame = createImageFrame(dicomDataBuffer, options);
+    imageFrameCreated = true;
+  }
+  if (options && options.cacheKey && imageFrameCreated) {
+    imageFrameCache.set(options.cacheKey, imageFrame);
+  }
+
+  const pipeline = Pipeline.create(gpuDevice, imageFrame);
+  const renderingResult = await pipeline.render(imageFrame, options);
+
+  return renderingResult;
+}
+
+/**
+ * Creates an image frame from DICOM data.
+ */
+function createImageFrame(
+  dicomDataBuffer: Uint8Array,
+  options?: {
+    frameIndex?: number;
+  }
+): ImageFrameType {
   options = options || {};
 
   // Parse DICOM dataset
@@ -245,10 +279,7 @@ export async function render(
     pixelData: typedPixelData,
   };
 
-  const pipeline = Pipeline.create(gpuDevice, imageFrame);
-  const renderingResult = await pipeline.render(imageFrame, options);
-
-  return renderingResult;
+  return imageFrame;
 }
 
 /**
