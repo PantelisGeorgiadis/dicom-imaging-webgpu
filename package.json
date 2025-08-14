@@ -1,6 +1,6 @@
 {
   "name": "dicom-imaging-webgpu",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "DICOM image rendering pipeline that leverages WebGPU for hardware-accelerated visualization",
   "type": "module",
   "main": "build/dicom-imaging-webgpu.js",
@@ -28,7 +28,7 @@
     "@trivago/prettier-plugin-sort-imports": "^5.2.2",
     "@types/node": "^24.2.1",
     "@types/pako": "^2.0.3",
-    "@types/web": "^0.0.260",
+    "@types/web": "^0.0.261",
     "@typescript-eslint/eslint-plugin": "^8.29.1",
     "@typescript-eslint/parser": "^8.29.1",
     "@webgpu/types": "^0.1.64",
