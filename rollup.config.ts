@@ -4,6 +4,7 @@ import resolve from '@rollup/plugin-node-resolve';
 import terser from '@rollup/plugin-terser';
 import { RollupOptions } from 'rollup';
 import dts from 'rollup-plugin-dts';
+import license from 'rollup-plugin-license';
 import typescript from 'rollup-plugin-typescript2';
 
 const config: RollupOptions = {
@@ -24,6 +25,9 @@ const config: RollupOptions = {
     babel({
       babelHelpers: 'bundled',
       exclude: 'node_modules/**',
+    }),
+    license({
+      banner: { commentStyle: 'ignored', content: `Copyright <%= moment().format('YYYY') %>` },
     }),
   ],
 };

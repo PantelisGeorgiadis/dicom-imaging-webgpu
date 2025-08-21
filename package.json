@@ -1,6 +1,6 @@
 {
   "name": "dicom-imaging-webgpu",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "DICOM image rendering pipeline that leverages WebGPU for hardware-accelerated visualization",
   "type": "module",
   "main": "build/dicom-imaging-webgpu.js",
@@ -14,6 +14,7 @@
   },
   "author": "Pantelis Georgiadis",
   "license": "MIT",
+  "homepage": "https://github.com/PantelisGeorgiadis/dicom-imaging-webgpu",
   "dependencies": {
     "dicom-parser": "^1.8.21",
     "pako": "^2.1.0"
@@ -41,6 +42,7 @@
     "prettier": "^3.5.3",
     "rollup": "^4.40.0",
     "rollup-plugin-dts": "^6.2.3",
+    "rollup-plugin-license": "^3.6.0",
     "rollup-plugin-serve": "^3.0.0",
     "rollup-plugin-typescript2": "^0.36.0",
     "shx": "^0.4.0",
