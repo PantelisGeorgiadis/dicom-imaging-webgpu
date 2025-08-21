@@ -1,4 +1,4 @@
-declare const version = "0.0.6";
+declare const version = "0.0.7";
 
 /**
  * Initializes the frame decoder.
